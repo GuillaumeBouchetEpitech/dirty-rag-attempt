@@ -1,0 +1,19 @@
+{
+  "name": "vectra",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "tsx": "^4.19.2",
+    "vectra": "^0.9.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.9.3"
+  }
+}

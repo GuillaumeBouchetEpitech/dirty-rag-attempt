@@ -3,10 +3,13 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { LocalIndex } from 'vectra';
 import * as dotenv from 'dotenv';
+import * as dns from 'dns';
+
 
 
 dotenv.config();
 
+dns.setDefaultResultOrder("ipv4first");
 
 // console.log(process.env);
 

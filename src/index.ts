@@ -1,367 +1,34 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import { LocalIndex } from 'vectra';
 import * as dotenv from 'dotenv';
 import * as dns from 'dns';
 
+import { ITool, MyOllama } from './MyOllama';
+import { MyVectorStore } from './MyVectorStore';
+import { asToolCalls, extractJsonStructures, IToolUse } from './extractData';
+import { askSomething } from './askSomething';
 
 
-dotenv.config();
-
-dns.setDefaultResultOrder("ipv4first");
-
-// console.log(process.env);
-
-
-
-interface IString {
-  type: "string";
-  enum?: string[];
-  description: string;
-};
-
-interface ITool {
-  type: string;
-  function: {
-    name: string;
-    description: string;
-    parameters: {
-      type: "object";
-      properties: {
-        [key in string]: IString;
-      };
-      required: string[];
-    };
-  };
-}
+dotenv.config(); // for OLLAMA_URL if using remote machines
 
-interface IToolUse {
-  name: string,
-  arguments: Record<string, string>;
-};
+dns.setDefaultResultOrder("ipv4first"); // solve ipv6 issues
 
-const asToolCalls = (str: string): IToolUse[] | undefined => {
 
-  // scan for tool calls
 
-  const allSlices: string[] = [];
-
-  let tmpStr = str.slice(0);
 
-  for (let ii = 0; ii < tmpStr.length; ++ii) {
-    if (tmpStr[ii] === '[') {
 
-      let squareBracketLevel = 1;
-      let curlyBracketLevel = 0;
-      let smoothBracketLevel = 0;
-      // let singleQuoteLevel = 0;
-      // let doubleQuoteLevel = 0;
-
-      for (let jj = ii + 1; jj < tmpStr.length; ++jj) {
-        if (tmpStr[jj] === '[') { squareBracketLevel += 1 };
-        if (tmpStr[jj] === ']') { squareBracketLevel -= 1 };
-        if (tmpStr[jj] === '{') { curlyBracketLevel += 1 };
-        if (tmpStr[jj] === '}') { curlyBracketLevel -= 1 };
-        if (tmpStr[jj] === '(') { smoothBracketLevel += 1 };
-        if (tmpStr[jj] === ')') { smoothBracketLevel -= 1 };
-        // if (tmpStr[jj] === "'") { singleQuoteLevel += 1 };
-        // if (tmpStr[jj] === "'") { singleQuoteLevel -= 1 };
-        // if (tmpStr[jj] === '"') { doubleQuoteLevel += 1 };
-        // if (tmpStr[jj] === '"') { doubleQuoteLevel -= 1 };
-
-        if (
-          squareBracketLevel == 0 &&
-          curlyBracketLevel == 0 &&
-          smoothBracketLevel == 0 //&&
-          // singleQuoteLevel == 0 &&
-          // doubleQuoteLevel == 0
-        ) {
-          allSlices.push(tmpStr.slice(ii, jj + 1));
-          ii = jj;
-          break;
-        }
-      }
-
-    }
-  }
-
-  // console.log('allSlices', allSlices);
-
-  const allData: any[] = allSlices.map(tmpStr => {
 
-    try {
 
-      const currData = JSON.parse(tmpStr)
 
-      // console.log('currData', currData);
 
-      if (!Array.isArray(currData)) {
-        // console.log('not an array');
-        return undefined;
-      }
 
-      for (let ii = 0; ii < currData.length; ++ii) {
-        if (
-          typeof(currData[ii].name) !== 'string' ||
-          typeof(currData[ii].arguments) !== 'object'
-        ) {
-          console.log('not an object');
-          return;
-        }
-      }
 
-      return currData;
-    } catch (err) {
-      return;
-    }
 
-  })
-  .flat()
-  .filter(val => val !== undefined);
 
-  // console.log('allData', allData);
 
-  return allData as IToolUse[];
-};
 
-
-
-class MyOllama {
-
-  private _baseUrl: string;
-  private _embeddingModel: string;
-  private _generationModel: string;
-
-  //
-  //
-  //
-
-  constructor(
-    baseUrl: string,
-    embeddingModel: string,
-    generationModel: string,
-  ) {
-    this._baseUrl = baseUrl;
-    this._embeddingModel = embeddingModel;
-    this._generationModel = generationModel;
-  }
-
-  //
-  //
-  //
-
-  async getVector(text: string): Promise<number[]> {
-    const result = await fetch(`${this._baseUrl}/api/embeddings`, {
-      method: "POST",
-      body: JSON.stringify({
-        model: this._embeddingModel,
-        prompt: text
-      })
-    });
-    const jsonVal = await result.json();
-    return jsonVal.embedding;
-  };
-
-  //
-  //
-  //
-
-  async generate(text: string): Promise<string> {
-
-    const result = await fetch(`${this._baseUrl}/api/generate`, {
-      method: "POST",
-      body: JSON.stringify({
-        stream: false,
-        model: this._generationModel,
-        prompt: text,
-        options: { temperature: 0 }
-      })
-    });
-    const jsonVal = await result.json();
-    return jsonVal.response;
-  }
-
-}
-
-
-
-
-
-
-
-
-
-
-
-interface IMetaData {
-  filename: string;
-  text: string;
-}
-
-type getVectorCallbackType = (text: string) => Promise<number[]>;
-
-class MyVectorStore {
-
-  private _index: LocalIndex;
-  private _getVectorCallback: getVectorCallbackType;
-
-  //
-  //
-  //
-
-  constructor(pathToIndex: string, getVectorCallback: getVectorCallbackType) {
-    this._index = new LocalIndex(pathToIndex);
-    this._getVectorCallback = getVectorCallback;
-  }
-
-  //
-  //
-  //
-
-  async ensureCreated() {
-    if (!await this._index.isIndexCreated()) {
-      await this._index.createIndex();
-    }
-  }
-
-  //
-  //
-  //
-
-  async addItem(filename: string, text: string) {
-
-    console.log(`add item`);
-
-    const vector = await this._getVectorCallback(text);
-
-    const results = await this._index.queryItems(vector, 1);
-
-    if (
-      results.length > 0 &&
-      results[0].item.metadata.filename.toString() === filename
-    ) {
-      console.log(` -> duplicated item -> skipped`);
-      return;
-    }
-
-    await this._index.insertItem({ vector, metadata: { filename, text } });
-  }
-
-  //
-  //
-  //
-
-  async query(text: string): Promise<IMetaData[]> {
-
-    const vector = await this._getVectorCallback(text);
-    const results = await this._index.queryItems(vector, 1);
-
-    return results.map<IMetaData>(val => ({
-      filename: val.item.metadata.filename.toString(),
-      text: val.item.metadata.text.toString()
-    }));
-  }
-
-}
-
-
-
-
-
-
-type AskOptions = {
-  ollamaInstance: MyOllama,
-  prompt: string,
-  question: string,
-  context?: string,
-  // vectorStore?: MyVectorStore,
-  tools?: ITool[],
-};
-
-const _ask = async ({
-  ollamaInstance,
-  prompt,
-  question,
-  context,
-  // vectorStore,
-  tools,
-}: AskOptions): Promise<string> => {
-
-  console.log(`\nQUESTION:\n -> "${question}"`)
-
-  let completePrompt = "";
-
-  if (tools && tools.length > 0) {
-    completePrompt += `[AVAILABLE_TOOLS]`;
-    completePrompt += JSON.stringify(tools);
-    completePrompt += `[/AVAILABLE_TOOLS]`;
-  }
-
-  completePrompt += `\n`;
-  completePrompt += `[INSTRUCTION]\n`;
-  completePrompt += `\n`;
-  completePrompt += `${prompt}\n`;
-  completePrompt += `\n`;
-
-  if (context) {
-    completePrompt += `CONTEXT:\n`;
-    completePrompt += `\n`;
-    completePrompt += `${context}\n`;
-  }
-
-  completePrompt += `\n`;
-  completePrompt += `QUESTION:\n`;
-  completePrompt += `\n`;
-  completePrompt += `${question}\n`;
-  completePrompt += `\n`;
-  completePrompt += `[/INSTRUCTION]\n`;
-  completePrompt += `\n`;
-
-  console.log(`
-####
-#########
-################## PROMPT ######################
-"${completePrompt}"
-################## PROMPT ######################
-#########
-####
-`)
-
-  const startTime = Date.now();
-
-  const response = await ollamaInstance.generate(completePrompt);
-
-  const stopTime = Date.now();
-  const deltaTime = stopTime - startTime;
-
-  console.log(`\nRESPONSE:\n -> "${response}"\n`)
-  console.log(`\ntime elapsed: ${deltaTime}ms (${deltaTime / 1000}s)\n`);
-
-  return response;
-};
-
-
-
-
-
-
-
-
-
-
-
-const asyncRun = async () => {
-
-
-  const ollamaUrl = process.env['OLLAMA_URL'] || "http://localhost:11434";
-
-  const myOllama = new MyOllama(
-    ollamaUrl,
-    "nomic-embed-text:latest",
-    "mistral:latest"
-    // "llama3-groq-tool-use"
-  );
+const _initializeVectorStore = async (myOllama: MyOllama): Promise<MyVectorStore> => {
 
   //
   // initialize vector store
@@ -395,111 +62,195 @@ const asyncRun = async () => {
     await myVectorStore.addItem(docPath, docContent);
   }
 
+  return myVectorStore
+};
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+const _initializeToolCalling = (
+  myOllama: MyOllama,
+  myVectorStore: MyVectorStore
+): {
+  tools: ITool[];
+  toolsMap: Map<string, (options: IToolUse) => Promise<string | undefined>>;
+} => {
+
   //
-  // initialize the tools
+  //
   //
 
-  const tools: ITool[] = [
-    {
-      type: "function",
-      function: {
-        name: "get_context_information",
-        description: "Get answers about english history",
-        parameters: {
-          type: "object",
-          properties: {
-            question: {
-              type: "string",
-              description: "The question to ask"
-            },
+  const get_context_information_def: ITool = {
+    type: "function",
+    function: {
+      name: "get_context_information",
+      description: "Get answers about english history",
+      parameters: {
+        type: "object",
+        properties: {
+          question: {
+            type: "string",
+            description: "The question to ask"
           },
-          required: ["question"]
-        }
-      }
-    },
-    {
-      type: "function",
-      function: {
-        name: "get_current_weather",
-        description: "Get the current weather",
-        parameters: {
-          type: "object",
-          properties: {
-            location: {
-              type: "string",
-              description: "The city and state, e.g. San Francisco, CA"
-            },
-            format: {
-              type: "string",
-              enum: ["celsius", "fahrenheit"],
-              description: "The temperature unit to use. Infer this from the users location."
-            }
-          },
-          required: ["location", "format"]
-        }
+        },
+        required: ["question"]
       }
     }
-  ];
+  };
 
-  const toolsMap = new Map<string, (options: IToolUse) => Promise<void>>([
-    [
-      'get_context_information',
-      async (options: IToolUse) => {
+  const get_context_information_impl = async (
+    options: IToolUse
+  ): Promise<string | undefined> => {
 
-        console.log(options);
+    console.log(options);
 
-        if (typeof(options.arguments.question) !== 'string') {
-          return;
-        }
+    const { question } = options.arguments;
 
-        const context = await myVectorStore.query(options.arguments.question);
+    if (typeof(question) !== 'string') {
+      return;
+    }
 
-        // console.log(`\ncontext retrieved: ${context.length}`)
-        // for (let ii = 0; ii < context.length; ++ii) {
-        //   console.log(` -> context[${ii}]: "${context[ii].filename}"`)
-        // }
+    const retrievedTexts = await myVectorStore.query(question, 1);
 
-        const response = await _ask({
-          ollamaInstance: myOllama,
-          prompt: `Say you don't know if you don't know. otherwise use the context to answer the question of the user.`,
-          question: options.arguments.question,
-          context: context.map(val => val.text).join("\n\n"),
-        });
+    // console.log(`\ncontext retrieved: ${context.length}`)
+    // for (let ii = 0; ii < context.length; ++ii) {
+    //   console.log(` -> context[${ii}]: "${context[ii].filename}"`)
+    // }
 
-        console.log(response);
+    const response = await askSomething({
+      ollamaInstance: myOllama,
+      prompt: `Say you don't know if you don't know. otherwise use the context to answer the question of the user.`,
+      question,
+      context: retrievedTexts.map(val => val.text).join("\n\n"),
+    });
+
+    console.log(response);
+
+    return response;
+  };
+
+  //
+  //
+  //
+
+  const get_current_weather_def: ITool = {
+    type: "function",
+    function: {
+      name: "get_current_weather",
+      description: "Get the current weather",
+      parameters: {
+        type: "object",
+        properties: {
+          location: {
+            type: "string",
+            description: "The city and state, e.g. San Francisco, CA"
+          },
+          format: {
+            type: "string",
+            enum: ["celsius", "fahrenheit"],
+            description: "The temperature unit to use. Infer this from the users location."
+          }
+        },
+        required: ["location", "format"]
       }
+    }
+  };
+
+  const get_current_weather_impl = async (options: IToolUse): Promise<string | undefined> => {
+
+    console.log(options);
+
+    if (typeof(options.arguments.location) !== 'string') {
+      return;
+    }
+
+    const response = await askSomething({
+      ollamaInstance: myOllama,
+      prompt: `answer like a professional anchor.`,
+      question: `Describe the weather in "${options.arguments.location}"`,
+      context: `the weather in "${options.arguments.location}" is always nice`,
+    });
+
+    console.log(response);
+
+    return response;
+  };
+
+  //
+  //
+  //
+
+  const toolsMap = new Map<string, (options: IToolUse) => Promise<string | undefined>>([
+    [
+      get_context_information_def.function.name,
+      get_context_information_impl
     ],
     [
-      'get_current_weather',
-      async (options: IToolUse) => {
-
-        console.log(options);
-
-        if (typeof(options.arguments.location) !== 'string') {
-          return;
-        }
-
-        const response = await _ask({
-          ollamaInstance: myOllama,
-          prompt: `answer like a professional anchor.`,
-          question: `Describe the weather in "${options.arguments.location}"`,
-          context: `the weather in "${options.arguments.location}" is always nice`,
-        });
-
-        console.log(response);
-      }
+      get_current_weather_def.function.name,
+      get_current_weather_impl
     ]
   ]);
 
-  //
-  // start
-  //
+  const tools: ITool[] = [
+    get_context_information_def,
+    get_current_weather_def,
+  ];
 
-  const response = await _ask({
+  return { tools, toolsMap }
+};
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+const askAgentWorkflowSomething = async (
+  myOllama: MyOllama,
+  tools: ITool[],
+  toolsMap: Map<string, (options: IToolUse) => Promise<string | undefined>>,
+  question: string
+): Promise<string[]> => {
+
+  const response = await askSomething({
     ollamaInstance: myOllama,
     prompt: `determine which tools to use, don't answer anything else. just give the tool calls`,
-    question: `Who was Boudicca and what did she do?
-    and give me the weather in Paris while you're at it <3`,
+    question: question,
     tools,
   });
 
@@ -507,18 +258,178 @@ const asyncRun = async () => {
 
   console.log('allToolCalls', allToolCalls);
 
+  const responses: string[] = [];
+
   for (const currCall of allToolCalls) {
     // console.log(currCall);
 
     const currTool = toolsMap.get(currCall.name);
     if (!currTool) {
-      continue;
+      continue; // tool not found -> skip
     }
 
     console.log(`\nTOOL CALL: "${JSON.stringify(currCall)}"\n`);
 
-    await currTool(currCall);
+    const response = await currTool(currCall);
+    if (response) {
+      responses.push(response);
+    }
+
   }
+
+  return responses;
+};
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+const _askDecomposedQuestions = async (
+  myOllama: MyOllama,
+  question: string,
+  callback: (question: string) => Promise<string>,
+): Promise<string> => {
+
+
+  // decompose
+  const responseA = await askSomething({
+    ollamaInstance: myOllama,
+    prompt: `decompose the user's question into mutliple tasks in a json array of string`,
+    question,
+    // question: `Who was Boudicca and what did she do?
+    // and give me the weather in Paris while you're at it <3`,
+  });
+
+  const allStrings = extractJsonStructures(responseA).flat();
+
+  console.log('allStrings', allStrings);
+
+
+  const finalResults: { question: string;  answers: string }[] = [];
+
+  for (const subQuestion of allStrings) {
+
+    // const answers = await askAgentWorkflowSomething(myOllama, tools, toolsMap, subQuestion);
+    const answers = await callback(subQuestion);
+
+    // console.log('result', result);
+
+    finalResults.push({ question, answers });
+  }
+
+  for (const {question, answers} of finalResults) {
+    console.log('-> question')
+    console.log(' ---> ', question)
+    console.log('answers')
+    console.log(answers)
+  }
+
+  const finalQuestion = finalResults
+    // .map(({question, answers}, index) => `\nquestion${index}:\n${question}\n\nanswers${index}\n${answers.join('\n')}`)
+    // .map(({answers}) => `\n${answers.join('\n')}\n`)
+    .map(({answers}) => `\n${answers}\n`)
+    .join('\n');
+
+  // recompose
+  return await askSomething({
+    ollamaInstance: myOllama,
+    prompt: `merge the answers into one big answer`,
+    question: finalQuestion,
+  });
+};
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+const asyncRun = async () => {
+
+  console.log("");
+  for (let ii = 0; ii < 5; ++ii)
+    console.log("START");
+  console.log("");
+
+  //
+  // initialize
+  //
+
+  const ollamaUrl = process.env['OLLAMA_URL'] || "http://localhost:11434";
+
+  const myOllama = new MyOllama(
+    ollamaUrl,
+    "nomic-embed-text:latest",
+    "mistral:latest"
+  );
+
+  const myVectorStore = await _initializeVectorStore(myOllama);
+
+  const { tools, toolsMap } = _initializeToolCalling(myOllama, myVectorStore);
+
+  //
+  // start
+  //
+
+  const answer = await _askDecomposedQuestions(
+    myOllama,
+    `Who was Boudicca and what did she do?
+    and give me the weather in Paris while you're at it <3`,
+    async (subQuestion: string): Promise<string> => {
+      const answers = await askAgentWorkflowSomething(myOllama, tools, toolsMap, subQuestion);
+      return answers.join('\n\n');
+    }
+  );
+
+
+  for (let ii = 0; ii < 5; ++ii)
+    console.log(`answer`);
+  console.log(`\n"${answer}"\n`);
+  for (let ii = 0; ii < 5; ++ii)
+    console.log(`/answer`);
+
+  console.log("");
+  for (let ii = 0; ii < 5; ++ii)
+    console.log("STOP");
+  console.log("");
 
 };
 asyncRun();

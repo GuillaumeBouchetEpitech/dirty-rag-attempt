@@ -1,29 +1,76 @@
 
-import * as fs from 'fs';
 import * as path from 'path';
 import * as dotenv from 'dotenv';
 import * as dns from 'dns';
 
-import { ITool, MyOllama } from './MyOllama';
-import { MyVectorStore } from './MyVectorStore';
-import { asToolCalls, extractJsonStructures, IToolUse } from './extractData';
-import { askSomething } from './askSomething';
+import {
+  ITool,
+  MyOllama,
+  MyVectorStore,
+  IToolUse,
+} from './tools';
 
-import { preprocessSkLearnDoc } from './pre-processing/pre-process-sklearn-doc';
+import {
+  preprocessSkLearnDoc,
+} from './pre-processing';
 
+import {
+  askSomething,
+  askAgentWorkflowSomething,
+  askDecomposedQuestions,
+} from './wrappers';
+
+//
+//
+//
+//
+//
+
+//
+//
+//
+//
+//
+
+//
+//
+//
+//
+//
+
+//
+//
+//
+//
+//
 
 dotenv.config(); // for OLLAMA_URL if using remote machines
 
 dns.setDefaultResultOrder("ipv4first"); // solve ipv6 issues
 
+//
+//
+//
+//
+//
 
+//
+//
+//
+//
+//
 
+//
+//
+//
+//
+//
 
-
-
-
-
-
+//
+//
+//
+//
+//
 
 const _initializeVectorStore = async (myOllama: MyOllama): Promise<MyVectorStore> => {
 
@@ -33,7 +80,10 @@ const _initializeVectorStore = async (myOllama: MyOllama): Promise<MyVectorStore
 
   const pathToIndex = path.join(__dirname, '..', 'index');
 
-  const myVectorStore = new MyVectorStore(pathToIndex, (...args) => myOllama.getVector(...args));
+  const myVectorStore = new MyVectorStore({
+    pathToIndex,
+    getVectorCallback: (text: string) => myOllama.getVector(text)
+  });
 
   await myVectorStore.ensureCreated();
 
@@ -41,9 +91,11 @@ const _initializeVectorStore = async (myOllama: MyOllama): Promise<MyVectorStore
 
   const allDocs = await preprocessSkLearnDoc();
 
+  let totalAdded = 0
+
   for (let ii = 0; ii < allDocs.length; ++ii) {
 
-    console.log(`progress: ${ii} / ${allDocs.length}`)
+    process.stdout.write(`\r -> progress: ${ii} / ${allDocs.length}`)
 
     const currDoc = allDocs[ii];
 
@@ -53,8 +105,12 @@ const _initializeVectorStore = async (myOllama: MyOllama): Promise<MyVectorStore
     }
 
     await myVectorStore.addItem(currDoc.filepath, currDoc.content);
+
+    totalAdded += 1;
   }
 
+  process.stdout.write(`\n`);
+  console.log(`---> total ingested ${totalAdded} / ${allDocs.length} (done once, then cached)`);
 
   // console.log({allDocs});
 
@@ -83,25 +139,29 @@ const _initializeVectorStore = async (myOllama: MyOllama): Promise<MyVectorStore
   return myVectorStore
 };
 
+//
+//
+//
+//
+//
 
+//
+//
+//
+//
+//
 
+//
+//
+//
+//
+//
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+//
+//
+//
+//
+//
 
 const _initializeToolCalling = (
   myOllama: MyOllama,
@@ -291,163 +351,29 @@ const _initializeToolCalling = (
   return { tools, toolsMap }
 };
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-const askAgentWorkflowSomething = async (
-  myOllama: MyOllama,
-  tools: ITool[],
-  toolsMap: Map<string, (options: IToolUse) => Promise<string | undefined>>,
-  question: string
-): Promise<string[]> => {
-
-  const response = await askSomething({
-    ollamaInstance: myOllama,
-    prompt: `determine which tools to use, don't answer anything else. just give the tool calls`,
-    question: question,
-    tools,
-  });
-
-  const allToolCalls = asToolCalls(response) || [];
-
-  console.log('allToolCalls', allToolCalls);
-
-  const responses: string[] = [];
-
-  for (const currCall of allToolCalls) {
-    // console.log(currCall);
-
-    const currTool = toolsMap.get(currCall.name);
-    if (!currTool) {
-      continue; // tool not found -> skip
-    }
-
-    console.log(`\nTOOL CALL: "${JSON.stringify(currCall)}"\n`);
-
-    const response = await currTool(currCall);
-    if (response) {
-      responses.push(response);
-    }
-
-  }
-
-  return responses;
-};
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-const _askDecomposedQuestions = async (
-  myOllama: MyOllama,
-  question: string,
-  callback: (question: string) => Promise<string>,
-): Promise<string> => {
-
-
-  // decompose
-  const responseA = await askSomething({
-    ollamaInstance: myOllama,
-    prompt: `decompose the user's question into mutliple tasks in a json array of string`,
-    question,
-  });
-
-  const allStrings = extractJsonStructures(responseA).flat();
-
-  console.log('allStrings', allStrings);
-
-  const finalResults: { question: string;  answers: string }[] = [];
-
-  for (const subQuestion of allStrings) {
-
-    const answers = await callback(subQuestion);
-
-    finalResults.push({ question, answers });
-  }
-
-  for (const {question, answers} of finalResults) {
-    console.log('-> question')
-    console.log(' ---> ', question)
-    console.log('answers')
-    console.log(answers)
-  }
-
-  const finalQuestion = finalResults
-    .map(({answers}) => `\n${answers}\n`)
-    .join('\n');
-
-  // recompose
-  return await askSomething({
-    ollamaInstance: myOllama,
-    prompt: `merge the answers into one big answer`,
-    question: finalQuestion,
-  });
-};
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+//
+//
+//
+//
+//
+
+//
+//
+//
+//
+//
+
+//
+//
+//
+//
+//
+
+//
+//
+//
+//
+//
 
 const asyncRun = async () => {
 
@@ -476,7 +402,7 @@ const asyncRun = async () => {
   // start
   //
 
-  const answer = await _askDecomposedQuestions(
+  const answer = await askDecomposedQuestions(
     myOllama,
     // `Who was Boudicca and what did she do?
     // and give me the weather in Paris while you're at it <3`,

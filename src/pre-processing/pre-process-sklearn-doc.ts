@@ -24,64 +24,66 @@ const baseUrl = new url.URL(rawBaseUrl);
 
 const _downloadOne = async (filename: string) => {
 
-  console.log('_downloadOne.filename', filename);
+  // console.log('_downloadOne.filename', filename);
 
   const destPath = path.join(downloadPath, filename);
 
   const stat = fs.statSync(destPath, {throwIfNoEntry: false})
   if (stat) {
-    console.log('_downloadOne.alreadyDone');
-    return
+    // console.log('_downloadOne.alreadyDone');
+    return false;
   }
 
   const tmpUrl = new url.URL(baseUrl.href);
 
-  console.log('_downloadOne.tmpUrl.pathname', tmpUrl.pathname);
-  console.log('_downloadOne.tmpUrl.href', tmpUrl.href);
+  // console.log('_downloadOne.tmpUrl.pathname', tmpUrl.pathname);
+  // console.log('_downloadOne.tmpUrl.href', tmpUrl.href);
 
   tmpUrl.pathname = path.join(tmpUrl.pathname, filename);
 
-  console.log('_downloadOne.tmpUrl.href', tmpUrl.href);
+  // console.log('_downloadOne.tmpUrl.href', tmpUrl.href);
 
   const response = await fetch(tmpUrl);
   const rawText = await  response.text();
 
-  console.log('_downloadOne.rawText', rawText.length);
+  // console.log('_downloadOne.rawText', rawText.length);
 
   fs.writeFileSync(destPath, rawText, 'utf8');
 
-  console.log('_downloadOne.done');
+  // console.log('_downloadOne.done');
+
+  return true;
 };
 
 //
 //
 //
 
-const _preProcessOne = async (filename: string) => {
+const _preProcessOne = (filename: string) => {
 
-  console.log('_preProcessOne.filename', filename);
+  // console.log('_preProcessOne.filename', filename);
 
   const partialFilename = filename.substring(0, filename.length - path.extname(filename).length);
 
-  console.log('_preProcessOne.partialFilename', partialFilename);
+  // console.log('_preProcessOne.partialFilename', partialFilename);
 
   const newFilename = `${partialFilename}.txt`;
 
-  console.log('_preProcessOne.newFilename', newFilename);
+  // console.log('_preProcessOne.newFilename', newFilename);
 
   const destPath = path.join(preProcessedPath, newFilename);
 
   const stat = fs.statSync(destPath, {throwIfNoEntry: false})
   if (stat) {
-    console.log('_preProcessOne.alreadyDone');
-    return
+    // console.log('_preProcessOne.alreadyDone');
+    return false;
   }
 
   const srcPath = path.join(downloadPath, filename);
 
   const htmlContent = fs.readFileSync(srcPath, 'utf8');
 
-  console.log('_preProcessOne.htmlContent', htmlContent.length);
+  // console.log('_preProcessOne.htmlContent', htmlContent.length);
 
   const root = cheerio.load(htmlContent);
 
@@ -96,11 +98,13 @@ const _preProcessOne = async (filename: string) => {
     .filter(line => line.trim().length > 0)
     .join('\n')
 
-  console.log('_preProcessOne.cleanedUpText', cleanedUpText.length);
+  // console.log('_preProcessOne.cleanedUpText', cleanedUpText.length);
 
   fs.writeFileSync(destPath, cleanedUpText, 'utf8');
 
-  console.log('_preProcessOne.done');
+  // console.log('_preProcessOne.done');
+
+  return true;
 };
 
 //
@@ -115,10 +119,29 @@ export const preprocessSkLearnDoc = async (): Promise<{ filepath: string; conten
   fs.mkdirSync(downloadPath, { recursive: true }); // ensure folder
   fs.mkdirSync(preProcessedPath, { recursive: true }); // ensure folder
 
-  for (const currLink of links) {
-    await _downloadOne(currLink);
-    _preProcessOne(currLink);
+  let totalDownload = 0;
+  let totalProcessed = 0;
+
+  for (let ii = 0; ii < links.length; ++ii) {
+
+    const currLink = links[ii]
+
+    process.stdout.write(`\r -> processing link: ${ii} / ${links.length}`);
+
+    const wasDownloaded = await _downloadOne(currLink);
+    const wasProcessed = _preProcessOne(currLink);
+
+    if (wasDownloaded) {
+      totalDownload += 1;
+    }
+    if (wasProcessed) {
+      totalProcessed += 1;
+    }
   }
+
+  process.stdout.write(`\n`);
+  console.log(` ---> total downloaded: ${totalDownload} / ${links.length} (done once, then cached)`);
+  console.log(` ---> total processed: ${totalProcessed} / ${links.length} (done once, then cached)`);
 
   const allFiles: { filepath: string; content: string; }[] = [];
 

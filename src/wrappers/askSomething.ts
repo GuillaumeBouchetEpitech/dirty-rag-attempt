@@ -1,6 +1,6 @@
 
 
-import { ITool, MyOllama } from './MyOllama';
+import { ITool, MyOllama } from '../tools';
 
 
 export type AskOptions = {

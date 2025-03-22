@@ -88,7 +88,7 @@ export const extractJsonStructures = (str: string): any[] => {
 
 export const asToolCalls = (
   str: string,
-): IToolUse[] | undefined => {
+): IToolUse[] => {
 
   // scan for tool calls
 

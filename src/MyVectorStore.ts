@@ -40,7 +40,7 @@ export class MyVectorStore {
 
   async addItem(filename: string, text: string) {
 
-    console.log(`add item`);
+    console.log(`add item "${filename}"`);
 
     const vector = await this._getVectorCallback(text);
 
@@ -55,6 +55,21 @@ export class MyVectorStore {
     }
 
     await this._index.insertItem({ vector, metadata: { filename, text } });
+  }
+
+  //
+  //
+  //
+
+  async confirmFilenamePresence(filename: string): Promise<boolean> {
+
+    console.log(`confirm item "${filename}"`);
+
+    const results = await this._index.listItemsByMetadata({ filename });
+
+    // console.log(`results`, results);
+
+    return results.length > 0;
   }
 
   //

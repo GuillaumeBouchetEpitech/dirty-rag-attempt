@@ -9,15 +9,12 @@ import { MyVectorStore } from './MyVectorStore';
 import { asToolCalls, extractJsonStructures, IToolUse } from './extractData';
 import { askSomething } from './askSomething';
 
+import { preprocessSkLearnDoc } from './pre-processing/pre-process-sklearn-doc';
+
 
 dotenv.config(); // for OLLAMA_URL if using remote machines
 
 dns.setDefaultResultOrder("ipv4first"); // solve ipv6 issues
-
-
-
-
-
 
 
 
@@ -36,31 +33,52 @@ const _initializeVectorStore = async (myOllama: MyOllama): Promise<MyVectorStore
 
   const pathToIndex = path.join(__dirname, '..', 'index');
 
-  const myVectorStore = new MyVectorStore(pathToIndex, myOllama.getVector.bind(myOllama));
+  const myVectorStore = new MyVectorStore(pathToIndex, (...args) => myOllama.getVector(...args));
 
   await myVectorStore.ensureCreated();
 
-  // ingestion logic
+  // experimental: ingestion logic
 
-  const docsDir = path.join(__dirname, '..', 'my-docs');
+  const allDocs = await preprocessSkLearnDoc();
 
-  const dirContent = fs.readdirSync(docsDir, {withFileTypes: true});
+  for (let ii = 0; ii < allDocs.length; ++ii) {
 
-  for (const docName of dirContent) {
+    console.log(`progress: ${ii} / ${allDocs.length}`)
 
-    if (!docName.isFile()) {
+    const currDoc = allDocs[ii];
+
+    const alreadyPresent = await myVectorStore.confirmFilenamePresence(currDoc.filepath);
+    if (alreadyPresent) {
       continue;
     }
 
-    const docPath = path.join(docName.path, docName.name);
-
-    const docContent = fs.readFileSync(docPath, 'utf8');
-
-    console.log("==========");
-    console.log(docPath);
-
-    await myVectorStore.addItem(docPath, docContent);
+    await myVectorStore.addItem(currDoc.filepath, currDoc.content);
   }
+
+
+  // console.log({allDocs});
+
+  // OLD: ingestion logic
+
+  // const docsDir = path.join(__dirname, '..', 'my-docs');
+
+  // const dirContent = fs.readdirSync(docsDir, {withFileTypes: true});
+
+  // for (const docName of dirContent) {
+
+  //   if (!docName.isFile()) {
+  //     continue;
+  //   }
+
+  //   const docPath = path.join(docName.path, docName.name);
+
+  //   const docContent = fs.readFileSync(docPath, 'utf8');
+
+  //   console.log("==========");
+  //   console.log(docPath);
+
+  //   await myVectorStore.addItem(docPath, docContent);
+  // }
 
   return myVectorStore
 };
@@ -97,11 +115,64 @@ const _initializeToolCalling = (
   //
   //
 
+  // const get_context_information_def: ITool = {
+  //   type: "function",
+  //   function: {
+  //     name: "get_context_information",
+  //     description: "Get answers about english history",
+  //     parameters: {
+  //       type: "object",
+  //       properties: {
+  //         question: {
+  //           type: "string",
+  //           description: "The question to ask"
+  //         },
+  //       },
+  //       required: ["question"]
+  //     }
+  //   }
+  // };
+
+  // const get_context_information_impl = async (
+  //   options: IToolUse
+  // ): Promise<string | undefined> => {
+
+  //   console.log(options);
+
+  //   const { question } = options.arguments;
+
+  //   if (typeof(question) !== 'string') {
+  //     return;
+  //   }
+
+  //   const retrievedTexts = await myVectorStore.query(question, 1);
+
+  //   // console.log(`\ncontext retrieved: ${context.length}`)
+  //   // for (let ii = 0; ii < context.length; ++ii) {
+  //   //   console.log(` -> context[${ii}]: "${context[ii].filename}"`)
+  //   // }
+
+  //   const response = await askSomething({
+  //     ollamaInstance: myOllama,
+  //     prompt: `Say you don't know if you don't know. otherwise use the context to answer the question of the user.`,
+  //     question,
+  //     context: retrievedTexts.map(val => val.text).join("\n\n"),
+  //   });
+
+  //   console.log(response);
+
+  //   return response;
+  // };
+
+  //
+  //
+  //
+
   const get_context_information_def: ITool = {
     type: "function",
     function: {
       name: "get_context_information",
-      description: "Get answers about english history",
+      description: "Get answers about the machine learn library named sklearn",
       parameters: {
         type: "object",
         properties: {
@@ -127,7 +198,8 @@ const _initializeToolCalling = (
       return;
     }
 
-    const retrievedTexts = await myVectorStore.query(question, 1);
+    const maxRetrieval = 3;
+    const retrievedTexts = await myVectorStore.query(question, maxRetrieval);
 
     // console.log(`\ncontext retrieved: ${context.length}`)
     // for (let ii = 0; ii < context.length; ++ii) {
@@ -136,7 +208,10 @@ const _initializeToolCalling = (
 
     const response = await askSomething({
       ollamaInstance: myOllama,
-      prompt: `Say you don't know if you don't know. otherwise use the context to answer the question of the user.`,
+      prompt: `
+        Say you don't know if you don't know.
+        otherwise use the context to answer the question of the user.
+      `,
       question,
       context: retrievedTexts.map(val => val.text).join("\n\n"),
     });
@@ -316,23 +391,17 @@ const _askDecomposedQuestions = async (
     ollamaInstance: myOllama,
     prompt: `decompose the user's question into mutliple tasks in a json array of string`,
     question,
-    // question: `Who was Boudicca and what did she do?
-    // and give me the weather in Paris while you're at it <3`,
   });
 
   const allStrings = extractJsonStructures(responseA).flat();
 
   console.log('allStrings', allStrings);
 
-
   const finalResults: { question: string;  answers: string }[] = [];
 
   for (const subQuestion of allStrings) {
 
-    // const answers = await askAgentWorkflowSomething(myOllama, tools, toolsMap, subQuestion);
     const answers = await callback(subQuestion);
-
-    // console.log('result', result);
 
     finalResults.push({ question, answers });
   }
@@ -345,8 +414,6 @@ const _askDecomposedQuestions = async (
   }
 
   const finalQuestion = finalResults
-    // .map(({question, answers}, index) => `\nquestion${index}:\n${question}\n\nanswers${index}\n${answers.join('\n')}`)
-    // .map(({answers}) => `\n${answers.join('\n')}\n`)
     .map(({answers}) => `\n${answers}\n`)
     .join('\n');
 
@@ -411,7 +478,9 @@ const asyncRun = async () => {
 
   const answer = await _askDecomposedQuestions(
     myOllama,
-    `Who was Boudicca and what did she do?
+    // `Who was Boudicca and what did she do?
+    // and give me the weather in Paris while you're at it <3`,
+    `Could you explain to me what does the sklearn Binarizer class does?
     and give me the weather in Paris while you're at it <3`,
     async (subQuestion: string): Promise<string> => {
       const answers = await askAgentWorkflowSomething(myOllama, tools, toolsMap, subQuestion);

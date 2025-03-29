@@ -2,15 +2,22 @@
 import { ITool, MyOllama, asToolCalls, IToolUse } from '../tools';
 import { askSomething } from './askSomething';
 
-export const askAgentWorkflowSomething = async (
-  myOllama: MyOllama,
+interface IAgentWorkflowQuestionsDef {
+  ollamaInstance: MyOllama,
   tools: ITool[],
   toolsMap: Map<string, (options: IToolUse) => Promise<string | undefined>>,
   question: string
-): Promise<string[]> => {
+}
+
+export const askAgentWorkflowSomething = async ({
+  ollamaInstance,
+  tools,
+  toolsMap,
+  question,
+}: IAgentWorkflowQuestionsDef): Promise<string[]> => {
 
   const response = await askSomething({
-    ollamaInstance: myOllama,
+    ollamaInstance,
     prompt: `determine which tools to use, don't answer anything else. just give the tool calls`,
     question: question,
     tools,

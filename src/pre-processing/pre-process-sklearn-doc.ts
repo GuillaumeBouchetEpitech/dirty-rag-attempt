@@ -91,12 +91,27 @@ const _preProcessOne = (filename: string) => {
   root('header').text(''); // noisy
   root('#pst-primary-sidebar').text(''); // noisy
   root('#pst-secondary-sidebar').text(''); // noisy
+  root('#pst-skip-link').text(''); // noisy
+  root('#pst-back-to-top').text(''); // noisy
+  root('.bd-search').text(''); // noisy
 
-  const cleanedUpText = root.text()
+  const rawHtml = root.html({})
+
+  const cleanedUpText = rawHtml
     .split('\n')
-    // only remove empty lines
+    .map(line => line.replace(/<\/?[a-zA-Z0-9=\-_\.\?\/"'#:\(\)%! ]*>/g, ' '))
+    .map(line => line.replace(/\s\s+/g, ' '))
+    // .map(line => line.replace(/<\/?[a-zA-Z0-9=\-_\.\?\/"'#:\(\)%! ]*>/g, ' '))
     .filter(line => line.trim().length > 0)
     .join('\n')
+    // .map(line => line.replace(/<\/?[a-zA-Z0-9=" ]*>/g, ' '))
+    // .replaceAll(/<\/?[a-zA-Z0-9=" ]*>/g, ' ').replace(/\s\s+/g, ' ').trim())
+
+  // const cleanedUpText = root.text()
+  //   .split('\n')
+  //   // only remove empty lines
+  //   .filter(line => line.trim().length > 0)
+  //   .join('\n')
 
   // console.log('_preProcessOne.cleanedUpText', cleanedUpText.length);
 

@@ -45,8 +45,6 @@ export class MyOllama {
 
   async getVector(text: string): Promise<number[]> {
 
-    const startTime = Date.now();
-
     const result = await fetch(`${this._baseUrl}/api/embeddings`, {
       method: "POST",
       body: JSON.stringify({
@@ -56,10 +54,6 @@ export class MyOllama {
     });
     const jsonVal = await result.json();
 
-    const stopTime = Date.now();
-    const deltaTime = stopTime - startTime;
-    console.log(`getVector() -> time elapsed: ${deltaTime}ms (${deltaTime / 1000}s)\n`);
-
     return jsonVal.embedding;
   };
 
@@ -68,8 +62,6 @@ export class MyOllama {
   //
 
   async generate(text: string): Promise<string> {
-
-    const startTime = Date.now();
 
     const result = await fetch(`${this._baseUrl}/api/generate`, {
       method: "POST",
@@ -82,11 +74,14 @@ export class MyOllama {
     });
     const jsonVal = await result.json();
 
-    const stopTime = Date.now();
-    const deltaTime = stopTime - startTime;
-    console.log(`generate() -> time elapsed: ${deltaTime}ms (${deltaTime / 1000}s)\n`);
-
     return jsonVal.response;
   }
+
+  //
+  //
+  //
+
+  get embeddingModel(): string { return this._embeddingModel; }
+  get generationModel(): string { return this._generationModel; }
 
 }

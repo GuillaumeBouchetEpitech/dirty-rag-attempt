@@ -95,7 +95,7 @@ const _initializeVectorStore = async (myOllama: MyOllama): Promise<MyVectorStore
 
   for (let ii = 0; ii < allDocs.length; ++ii) {
 
-    process.stdout.write(`\r -> progress: ${ii} / ${allDocs.length}`)
+    process.stdout.write(`\r -> ingestion progress: ${ii} / ${allDocs.length}`)
 
     const currDoc = allDocs[ii];
 
@@ -392,6 +392,7 @@ const asyncRun = async () => {
     ollamaUrl,
     "nomic-embed-text:latest",
     "mistral:latest"
+    // "llama3.1:8b"
   );
 
   const myVectorStore = await _initializeVectorStore(myOllama);
@@ -402,18 +403,26 @@ const asyncRun = async () => {
   // start
   //
 
-  const answer = await askDecomposedQuestions(
-    myOllama,
-    // `Who was Boudicca and what did she do?
-    // and give me the weather in Paris while you're at it <3`,
-    `Could you explain to me what does the sklearn Binarizer class does?
-    and give me the weather in Paris while you're at it <3`,
-    async (subQuestion: string): Promise<string> => {
-      const answers = await askAgentWorkflowSomething(myOllama, tools, toolsMap, subQuestion);
+  const question = `
+    if I want to use sklearn how to I binarize a dataset column?
+    and give me the weather in Paris while you're at it <3
+  `;
+
+  const answer = await askDecomposedQuestions({
+    ollamaInstance: myOllama,
+    question,
+    callback: async (subQuestion: string): Promise<string> => {
+
+      const answers = await askAgentWorkflowSomething({
+        ollamaInstance: myOllama,
+        tools,
+        toolsMap,
+        question: subQuestion,
+      });
+
       return answers.join('\n\n');
     }
-  );
-
+  });
 
   for (let ii = 0; ii < 5; ++ii)
     console.log(`answer`);

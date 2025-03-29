@@ -2,6 +2,7 @@
 
 import { ITool, MyOllama } from '../tools';
 
+import { runWithProgress } from './runWithProgress';
 
 export type AskOptions = {
   ollamaInstance: MyOllama,
@@ -11,15 +12,24 @@ export type AskOptions = {
   tools?: ITool[],
 };
 
-export const askSomething = async ({
-  ollamaInstance,
+//
+//
+//
+
+//
+//
+//
+
+//
+//
+//
+
+const _mistralSyntax = ({
   prompt,
   question,
   context,
   tools,
-}: AskOptions): Promise<string> => {
-
-  console.log(`\nQUESTION:\n -> "${question}"`)
+}: AskOptions): string => {
 
   let completePrompt = "";
 
@@ -49,6 +59,108 @@ export const askSomething = async ({
   completePrompt += `[/INSTRUCTION]\n`;
   completePrompt += `\n`;
 
+  return completePrompt;
+};
+
+//
+//
+//
+
+const _llamaSyntax = ({
+  prompt,
+  question,
+  context,
+  tools,
+}: AskOptions): string => {
+
+  let completePrompt = "";
+
+  const hasTools = (tools && tools.length > 0);
+
+  completePrompt += `
+    <|begin_of_text|>
+
+    <|start_header_id|>system<|end_header_id|>
+
+    Cutting Knowledge Date: December 2023
+    Today Date: 23 July 2024
+  `;
+
+  // When you receive a tool call response, use the output to format an answer to the original user question.
+
+  completePrompt += `You are a helpful assistant`;
+  if (hasTools) {
+    completePrompt += ` with tool calling capabilities`;
+  }
+  completePrompt += `.`;
+
+  completePrompt += `
+
+    ${prompt}
+
+    <|eot_id|>
+    <|start_header_id|>user<|end_header_id|>
+  `;
+
+  if (context) {
+    completePrompt += `
+      Context: ${context}
+    `;
+  }
+
+
+  if (hasTools) {
+    completePrompt += `
+      Given the following functions, please respond with a JSON for a function call with its proper arguments that best answers the given prompt.
+
+      Respond in the format {"name": function name, "arguments": dictionary of argument name and its value}. Do not use variables.
+
+      ${JSON.stringify(tools)}
+    `;
+  }
+
+  completePrompt += `
+
+    Question:
+    ${question}
+
+    <|eot_id|>
+    <|start_header_id|>assistant<|end_header_id|>
+  `;
+
+  return completePrompt;
+};
+
+//
+//
+//
+
+//
+//
+//
+
+//
+//
+//
+
+export const askSomething = async ({
+  ollamaInstance,
+  prompt,
+  question,
+  context,
+  tools,
+}: AskOptions): Promise<string> => {
+
+  console.log(`\nQUESTION:\n -> "${question}"`)
+
+  let completePrompt: string = '';
+  if (ollamaInstance.generationModel.indexOf('mistral') >= 0) {
+    completePrompt = _mistralSyntax({ ollamaInstance, prompt, question, context, tools });
+  }
+  else if (ollamaInstance.generationModel.indexOf('llama') >= 0) {
+    completePrompt = _llamaSyntax({ ollamaInstance, prompt, question, context, tools });
+  }
+
   console.log(`
 ####
 #########
@@ -59,15 +171,11 @@ export const askSomething = async ({
 ####
 `)
 
-  // const startTime = Date.now();
 
-  const response = await ollamaInstance.generate(completePrompt);
+  const response = await runWithProgress(() => ollamaInstance.generate(completePrompt));
 
-  // const stopTime = Date.now();
-  // const deltaTime = stopTime - startTime;
 
   console.log(`\n[RESPONSE]\n"${response}"\n[/RESPONSE]\n`)
-  // console.log(`\ntime elapsed: ${deltaTime}ms (${deltaTime / 1000}s)\n`);
 
   return response;
 };

@@ -167,7 +167,7 @@ const _initializeToolCalling = (
   myOllama: MyOllama,
   myVectorStore: MyVectorStore
 ): {
-  tools: ITool[];
+  allTools: ITool[];
   toolsMap: Map<string, (options: IToolUse) => Promise<string | undefined>>;
 } => {
 
@@ -258,7 +258,7 @@ const _initializeToolCalling = (
       return;
     }
 
-    const maxRetrieval = 3;
+    const maxRetrieval = 1;
     const retrievedTexts = await myVectorStore.query(question, maxRetrieval);
 
     // console.log(`\ncontext retrieved: ${context.length}`)
@@ -343,12 +343,12 @@ const _initializeToolCalling = (
     ]
   ]);
 
-  const tools: ITool[] = [
+  const allTools: ITool[] = [
     get_context_information_def,
     get_current_weather_def,
   ];
 
-  return { tools, toolsMap }
+  return { allTools, toolsMap }
 };
 
 //
@@ -391,13 +391,13 @@ const asyncRun = async () => {
   const myOllama = new MyOllama(
     ollamaUrl,
     "nomic-embed-text:latest",
-    "mistral:latest"
-    // "llama3.1:8b"
+    // "mistral:latest"
+    "llama3.1:8b"
   );
 
   const myVectorStore = await _initializeVectorStore(myOllama);
 
-  const { tools, toolsMap } = _initializeToolCalling(myOllama, myVectorStore);
+  const { allTools, toolsMap } = _initializeToolCalling(myOllama, myVectorStore);
 
   //
   // start
@@ -415,7 +415,7 @@ const asyncRun = async () => {
 
       const answers = await askAgentWorkflowSomething({
         ollamaInstance: myOllama,
-        tools,
+        tools: allTools,
         toolsMap,
         question: subQuestion,
       });

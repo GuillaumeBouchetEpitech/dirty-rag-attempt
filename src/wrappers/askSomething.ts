@@ -86,13 +86,11 @@ const _llamaSyntax = ({
     Today Date: 23 July 2024
   `;
 
-  // When you receive a tool call response, use the output to format an answer to the original user question.
-
-  completePrompt += `You are a helpful assistant`;
   if (hasTools) {
-    completePrompt += ` with tool calling capabilities`;
+    completePrompt += `You are a helpful assistant with tool calling capabilities.`;
+  } else {
+    completePrompt += `You are a helpful assistant.`;
   }
-  completePrompt += `.`;
 
   completePrompt += `
 
@@ -151,7 +149,7 @@ export const askSomething = async ({
   tools,
 }: AskOptions): Promise<string> => {
 
-  console.log(`\nQUESTION:\n -> "${question}"`)
+  console.log(`\nQUESTION:\n -> "${question}"`);
 
   let completePrompt: string = '';
   if (ollamaInstance.generationModel.indexOf('mistral') >= 0) {
@@ -171,11 +169,9 @@ export const askSomething = async ({
 ####
 `)
 
-
   const response = await runWithProgress(() => ollamaInstance.generate(completePrompt));
 
-
-  console.log(`\n[RESPONSE]\n"${response}"\n[/RESPONSE]\n`)
+  console.log(`\n[RESPONSE]\n"${response}"\n[/RESPONSE]\n`);
 
   return response;
 };

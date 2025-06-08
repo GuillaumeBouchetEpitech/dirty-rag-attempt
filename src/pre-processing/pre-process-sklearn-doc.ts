@@ -5,6 +5,8 @@ import * as path from "path"
 import * as url from "url"
 import * as cheerio from "cheerio"
 
+import TurndownService from 'turndown'
+
 //
 //
 //
@@ -97,23 +99,26 @@ const _preProcessOne = (filename: string) => {
 
   const rawHtml = root.html({})
 
-  const cleanedUpText = rawHtml
-    .split('\n')
-    .map(line => line.replace(/<\/?[a-zA-Z0-9=\-_\.\?\/"'#:\(\)%! ]*>/g, ' '))
-    .map(line => line.replace(/\s\s+/g, ' '))
-    // .map(line => line.replace(/<\/?[a-zA-Z0-9=\-_\.\?\/"'#:\(\)%! ]*>/g, ' '))
-    .filter(line => line.trim().length > 0)
-    .join('\n')
-    // .map(line => line.replace(/<\/?[a-zA-Z0-9=" ]*>/g, ' '))
-    // .replaceAll(/<\/?[a-zA-Z0-9=" ]*>/g, ' ').replace(/\s\s+/g, ' ').trim())
+  const turndownService = new TurndownService();
+  const cleanedUpText = turndownService.turndown(rawHtml);
 
-  // const cleanedUpText = root.text()
+  // const cleanedUpText = rawHtml
   //   .split('\n')
-  //   // only remove empty lines
+  //   .map(line => line.replace(/<\/?[a-zA-Z0-9=\-_\.\?\/"'#:\(\)%! ]*>/g, ' '))
+  //   .map(line => line.replace(/\s\s+/g, ' '))
+  //   // .map(line => line.replace(/<\/?[a-zA-Z0-9=\-_\.\?\/"'#:\(\)%! ]*>/g, ' '))
   //   .filter(line => line.trim().length > 0)
   //   .join('\n')
+  //   // .map(line => line.replace(/<\/?[a-zA-Z0-9=" ]*>/g, ' '))
+  //   // .replaceAll(/<\/?[a-zA-Z0-9=" ]*>/g, ' ').replace(/\s\s+/g, ' ').trim())
 
-  // console.log('_preProcessOne.cleanedUpText', cleanedUpText.length);
+  // // const cleanedUpText = root.text()
+  // //   .split('\n')
+  // //   // only remove empty lines
+  // //   .filter(line => line.trim().length > 0)
+  // //   .join('\n')
+
+  // // console.log('_preProcessOne.cleanedUpText', cleanedUpText.length);
 
   fs.writeFileSync(destPath, cleanedUpText, 'utf8');
 

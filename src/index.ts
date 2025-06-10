@@ -404,7 +404,7 @@ const asyncRun = async () => {
   //
 
   const question = `
-    if I want to use sklearn how to I binarize a dataset column?
+    if I want to use sklearn how do I binarize a dataset column?
     and give me the weather in Paris while you're at it <3
   `;
 

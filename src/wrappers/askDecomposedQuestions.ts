@@ -21,7 +21,7 @@ export const askDecomposedQuestions = async ({
 
   const prompt = `
     Do not answer the questions.
-    Decompose the questions into multiple sub-questions.
+    Count the total number of questions asked and decompose the questions into an equal number of sub-questions.
     Reply in a simple json array of string and nothing else
   `;
 

@@ -1,6 +1,6 @@
 
 
-import { MyOllama, extractJsonStructures } from '../tools';
+import { MyOllama, extractJsonStructures } from '../utilities';
 import { askSomething } from './askSomething';
 
 interface IDecomposedQuestionsDef {

@@ -8,7 +8,7 @@ import {
   MyOllama,
   MyVectorStore,
   IToolUse,
-} from './tools';
+} from './utilities';
 
 import {
   preprocessSkLearnDoc,

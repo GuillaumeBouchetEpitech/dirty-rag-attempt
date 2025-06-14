@@ -1,5 +1,5 @@
 
-import { ITool, MyOllama } from '../tools';
+import { ITool, MyOllama } from '../utilities';
 
 import { runWithProgress } from './runWithProgress';
 

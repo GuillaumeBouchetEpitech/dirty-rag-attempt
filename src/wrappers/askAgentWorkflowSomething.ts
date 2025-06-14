@@ -1,5 +1,5 @@
 
-import { ITool, MyOllama, asToolCalls, IToolUse } from '../tools';
+import { ITool, MyOllama, asToolCalls, IToolUse } from '../utilities';
 import { askSomething } from './askSomething';
 
 interface IAgentWorkflowQuestionsDef {

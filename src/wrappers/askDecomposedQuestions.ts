@@ -41,10 +41,11 @@ export const askDecomposedQuestions = async ({
   }
 
   for (const {question, answers} of finalResults) {
-    console.log('-> question')
-    console.log(' ---> ', question)
-    console.log('answers')
-    console.log(answers)
+    console.log('\n\n');
+    console.log('-> question');
+    console.log(' ---> ', question);
+    console.log('answers');
+    console.log(answers);
   }
 
   const finalQuestion = finalResults

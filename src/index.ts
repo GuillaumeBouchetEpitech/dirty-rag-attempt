@@ -91,7 +91,7 @@ const _initializeVectorStore = async (myOllama: MyOllama): Promise<MyVectorStore
 
   const allDocs = await preprocessSkLearnDoc();
 
-  let totalAdded = 0
+  let totalAdded = 0;
 
   for (let ii = 0; ii < allDocs.length; ++ii) {
 
@@ -258,7 +258,7 @@ const _initializeToolCalling = (
       return;
     }
 
-    const maxRetrieval = 1;
+    const maxRetrieval = 3;
     const retrievedTexts = await myVectorStore.query(question, maxRetrieval);
 
     // console.log(`\ncontext retrieved: ${context.length}`)

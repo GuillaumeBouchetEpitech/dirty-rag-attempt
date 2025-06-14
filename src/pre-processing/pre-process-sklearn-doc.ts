@@ -91,11 +91,15 @@ const _preProcessOne = (filename: string) => {
 
   root('head').text(''); // noisy
   root('header').text(''); // noisy
+
   root('#pst-primary-sidebar').text(''); // noisy
   root('#pst-secondary-sidebar').text(''); // noisy
   root('#pst-skip-link').text(''); // noisy
   root('#pst-back-to-top').text(''); // noisy
   root('.bd-search').text(''); // noisy
+  root('.bd-header-article').text(''); // noisy
+  root('.copyright').text(''); // noisy
+  root('.bd-footer-article').text(''); // noisy
 
   const rawHtml = root.html({})
 
@@ -118,7 +122,7 @@ const _preProcessOne = (filename: string) => {
   // //   .filter(line => line.trim().length > 0)
   // //   .join('\n')
 
-  // // console.log('_preProcessOne.cleanedUpText', cleanedUpText.length);
+  // console.log('_preProcessOne.cleanedUpText', cleanedUpText.length);
 
   fs.writeFileSync(destPath, cleanedUpText, 'utf8');
 

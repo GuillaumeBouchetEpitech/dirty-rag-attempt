@@ -4,10 +4,12 @@
 
 import { AskOptions } from './AskOptions';
 
-import { _llamaSyntax } from './askSomething-llama';
+import { _mistralSmallSyntax } from './askSomething-mistral-small';
 import { _mistralSyntax } from './askSomething-mistral';
+import { _llamaSyntax } from './askSomething-llama';
 
 import { runWithProgress } from './runWithProgress';
+import { OllamaOptions } from '../utilities';
 
 //
 //
@@ -21,13 +23,16 @@ import { runWithProgress } from './runWithProgress';
 //
 //
 
-export const askSomething = async ({
-  ollamaInstance,
-  prompt,
-  question,
-  context,
-  tools,
-}: AskOptions): Promise<string> => {
+export const askSomething = async (
+  {
+    ollamaInstance,
+    prompt,
+    question,
+    context,
+    tools,
+  }: AskOptions,
+  ollamaOptions?: OllamaOptions
+): Promise<string> => {
 
   console.log(`######################################################################################`);
   console.log(`######################################################################################`);
@@ -35,7 +40,10 @@ export const askSomething = async ({
   console.log(`\nQUESTION:\n -> "${question}"`);
 
   let completePrompt: string = '';
-  if (ollamaInstance.generationModel.indexOf('mistral') >= 0) {
+  if (ollamaInstance.generationModel.indexOf('mistral-small') >= 0) {
+    completePrompt = _mistralSmallSyntax({ ollamaInstance, prompt, question, context, tools });
+  }
+  else if (ollamaInstance.generationModel.indexOf('mistral') >= 0) {
     completePrompt = _mistralSyntax({ ollamaInstance, prompt, question, context, tools });
   }
   else if (ollamaInstance.generationModel.indexOf('llama') >= 0) {
@@ -50,9 +58,14 @@ export const askSomething = async ({
 ################## PROMPT ######################
 #########
 ####
-`)
+`);
 
-  const response = await runWithProgress(() => ollamaInstance.generate(completePrompt));
+  const response = await runWithProgress(
+    () => ollamaInstance.generate(
+      completePrompt,
+      ollamaOptions
+    )
+  );
 
   console.log(`\n[RESPONSE]\n"${response}"\n[/RESPONSE]\n`);
 

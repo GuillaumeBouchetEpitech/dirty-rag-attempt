@@ -1,0 +1,372 @@
+<!doctype html>
+<html lang="en-us">
+  <head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Dirty RAG</title>
+
+    <style>
+
+      body {
+        height: 100%;
+      /* }
+
+      body, h1, h2, p, ul, li { */
+        background-color: #0F0F0F;
+        color: #8F8F8F;
+        border: 0;
+        margin: 0;
+        padding: 0;
+        font-family: arial;
+      }
+
+      textarea {
+        background-color: #444444;
+        color: #FFFFFF;
+      }
+
+      /*  */
+      /*  */
+      /*  */
+
+      #main-area {
+        width: 100vw;
+        height: 100vh;
+
+        display: grid;
+        grid-template-columns: 1fr fit-content(30%) 1fr;
+        grid-template-rows: fit-content(30px) 1fr fit-content(100px);
+        /* grid-template-columns: repeat(3, 1fr); */
+        gap: 10px;
+      }
+
+      #main-header {
+        grid-column: 2;
+        grid-row: 1;
+
+        background: #004400;
+        padding: 0px;
+        margin: 0px;
+      }
+
+      #main-header h2 {
+        text-align: center;
+      }
+
+      #message-container {
+        grid-column-start: 1;
+        grid-column-end: 4;
+        grid-row: 2;
+
+        margin: 0;
+        padding: 0;
+
+        background: #440000;
+        padding: 10px;
+        overflow-y: auto;
+      }
+
+      #message-container-box {
+        display: grid;
+        grid-template-columns: 1fr 90% 1fr;
+        grid-template-rows: fit-content(20px) max-content;
+        gap: 10px;
+
+        margin: 0;
+        padding: 0;
+
+        background: #004400;
+      }
+      #message-container-box-body {
+        grid-column: 2;
+        grid-row: 2;
+
+        margin: 0;
+        padding: 0;
+
+        background: #330000;
+
+        text-align: left;
+      }
+
+      #user-area {
+        grid-column: 2;
+        grid-row: 3;
+
+        margin: 0;
+        padding: 0;
+
+        background: #000044;
+        padding: 10px;
+      }
+
+      /*  */
+      /*  */
+      /*  */
+
+      .system-message {
+        width: max-content;
+        background-color: #666644;
+        color: #FFFFFF;
+
+        /* margin: 0; */
+        padding: 0;
+
+        margin-top: 0px;
+        margin-bottom: 0px;
+        margin-left: 0;
+        width: 100%;
+        overflow-x: auto;
+      }
+
+      .system-message p {
+        background-color: #888844;
+        color: #FFFFFF;
+        margin: 0;
+        padding: 0;
+      }
+
+      .user-server-message {
+        width: max-content;
+        background-color: #444466;
+        color: #FFFFFF;
+        padding: 5px;
+        margin-top: 5px;
+        margin-bottom: 5px;
+        margin-left: auto;
+        max-width: 80%;
+        overflow-x: auto;
+      }
+
+      .user-server-message p {
+        background-color: #444466;
+        color: #FFFFFF;
+        margin: 0;
+        padding: 0;
+      }
+
+      .server-message {
+        width: max-content;
+        background-color: #664444;
+        color: #FFFFFF;
+        padding: 5px;
+        margin-top: 5px;
+        margin-bottom: 5px;
+        margin-left: 0;
+        max-width: 80%;
+        overflow-x: auto;
+      }
+
+      .server-message p {
+        background-color: #664444;
+        color: #FFFFFF;
+        margin: 0;
+        padding: 0;
+      }
+
+      .server-message-alt {
+        width: max-content;
+        background-color: #444444;
+        color: #FFFFFF;
+        padding: 5px;
+        margin-top: 5px;
+        margin-bottom: 5px;
+        margin-left: 0;
+        max-width: 80%;
+        overflow-x: auto;
+      }
+
+      .server-message-alt p {
+        background-color: #444444;
+        color: #FFFFFF;
+        margin: 0;
+        padding: 0;
+      }
+
+
+    </style>
+
+    <script type="text/javascript" src="./showdown.js"></script>
+
+    <script type="module">
+
+      const converter = new showdown.Converter();
+      const text = '# hello, markdown!';
+      const html = converter.makeHtml(text);
+      console.log("html", html);
+
+      const mainMessageContainer = document.querySelector("#message-container");
+      const messageContainer = document.querySelector("#message-container-box-body");
+      const userPrompt = document.querySelector("#user-prompt");
+      const userSend = document.querySelector("#user-send");
+
+      userPrompt.value = ""; // clear browser cache
+      userPrompt.disabled = true;
+      userSend.disabled = true;
+
+      //
+      //
+      //
+
+      const autoScrollMessages = () => {
+        mainMessageContainer.scroll({
+          top: mainMessageContainer.scrollHeight,
+          behavior: "smooth",
+        });
+      };
+
+      const onNewMessage = (message) => {
+
+        const jsonData = JSON.parse(message);
+
+        const parentDiv = document.createElement("div");
+        const newP = document.createElement("p");
+        const childDiv = document.createElement("div");
+        parentDiv.appendChild(newP);
+        parentDiv.appendChild(childDiv);
+
+        switch (jsonData.type) {
+          case 'system': {
+            parentDiv.setAttribute("class", "system-message");
+            newP.innerHTML = `<u>${jsonData.type.toUpperCase()}:</u>`;
+            childDiv.innerHTML = jsonData.data.replace(/\n/g, '<br/>'); // support multiple lines
+            break;
+          }
+          case 'user': {
+            parentDiv.setAttribute("class", "user-server-message");
+            newP.innerHTML = `<u>${jsonData.type.toUpperCase()}:</u>`;
+            childDiv.innerHTML = jsonData.data.replace(/\n/g, '<br/>'); // support multiple lines
+            break;
+          }
+          case 'logic':
+          case 'tools_list':
+          case 'context':
+          case 'prompt':
+          case 'tool_use': {
+            parentDiv.setAttribute("class", "server-message-alt");
+            newP.innerHTML = `<u>${jsonData.type.toUpperCase()}:</u>`;
+            childDiv.innerHTML = converter.makeHtml(jsonData.data);
+            break;
+          }
+          case 'assistant': {
+            parentDiv.setAttribute("class", "server-message");
+            newP.innerHTML = `<u>${jsonData.type.toUpperCase()}:</u>`;
+            childDiv.innerHTML = converter.makeHtml(jsonData.data);
+            break;
+          }
+          case 'separator': {
+            // parentDiv.setAttribute("class", "server-message-alt");
+            childDiv.innerHTML = "<br/><hr/><br/>";
+            break;
+          }
+          default: {
+            parentDiv.setAttribute("class", "server-message");
+            newP.innerHTML = "<u>UNKNOWN:</u><br/><hr/>";
+            childDiv.innerHTML = jsonData.data;
+            break;
+          }
+        }
+
+        messageContainer.appendChild(parentDiv);
+        autoScrollMessages();
+      };
+
+      const onConnectionEstablished = (socket) => {
+
+        userPrompt.disabled = false;
+        userPrompt.focus();
+
+        userPrompt.addEventListener('keyup', () => {
+          if (userPrompt.value.length === 0) {
+            userSend.disabled = true;
+          } else {
+            userSend.disabled = false;
+          }
+        });
+
+        const senToServer = (message) => {
+          if (userPrompt.value.length === 0) {
+            return;
+          }
+
+          socket.send(userPrompt.value);
+          userPrompt.value = ""
+        };
+
+        userPrompt.addEventListener('keydown', (event) => {
+          if (
+            event.key === "Enter" &&
+            event.shiftKey === false
+          ) {
+            console.log(event)
+            event.preventDefault();
+            senToServer();
+          }
+        });
+
+        userSend.addEventListener('click', () => {
+          senToServer();
+        });
+      }
+
+      //
+      //
+      //
+
+      window.addEventListener('load', () => {
+        console.log("loaded");
+
+        console.log("window.location.host", window.location.host);
+        console.log("window.location.hostname", window.location.hostname);
+        console.log("window.location.port", window.location.port);
+
+        const socket = new WebSocket(`ws://${window.location.host}`);
+        socket.addEventListener("open", (event) => {
+          onNewMessage(JSON.stringify({ type: 'system', data: "connected" }));
+          onConnectionEstablished(socket);
+        });
+        socket.addEventListener("close", (event) => {
+          userPrompt.disabled = true;
+          onNewMessage(JSON.stringify({ type: 'system', data: "disconnected" }));
+        });
+
+        socket.addEventListener("message", (event) => {
+          console.log(" ->", event.data);
+          onNewMessage(event.data);
+        });
+
+      });
+
+    </script>
+  </head>
+  <body>
+
+    <div id="main-area">
+
+      <div id="main-header">
+        <h2>Dirty RAG</h2>
+      </div>
+
+      <div id="message-container">
+        <div id="message-container-box">
+          <div id="message-container-box-body"></div>
+        </div>
+      </div>
+
+      <div id="user-area">
+        <textarea id="user-prompt" rows="4" cols="50"></textarea>
+        <br/>
+        <button id="user-send">Send</button>
+      </div>
+
+
+    </div>
+
+  </body>
+</html>
+
+
+

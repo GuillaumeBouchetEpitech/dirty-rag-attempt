@@ -1,23 +1,8 @@
 
-export interface ITool {
-  type: string;
-  function: {
-    name: string;
-    description: string;
-    parameters: {
-      type: "object";
-      properties: {
-        [key in string]: {
-          type: "string";
-          enum?: string[];
-          description: string;
-        };
-      };
-      required: string[];
-    };
-  };
+export interface OllamaOptions  {
+  temperature?: number;
+  num_predict?: number;
 }
-
 
 export class MyOllama {
 
@@ -61,7 +46,7 @@ export class MyOllama {
   //
   //
 
-  async generate(text: string): Promise<string> {
+  async generate(text: string, options: OllamaOptions = { temperature: 0 }): Promise<string> {
 
     const result = await fetch(`${this._baseUrl}/api/generate`, {
       method: "POST",
@@ -69,10 +54,12 @@ export class MyOllama {
         stream: false,
         model: this._generationModel,
         prompt: text,
-        options: { temperature: 0 }
-      })
+        options,
+      }),
     });
     const jsonVal = await result.json();
+
+    console.log('jsonVal', JSON.stringify(jsonVal, null, 2));
 
     return jsonVal.response;
   }

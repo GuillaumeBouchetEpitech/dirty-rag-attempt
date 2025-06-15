@@ -1,8 +1,5 @@
 
-export interface IToolUse {
-  name: string,
-  arguments: Record<string, string>;
-};
+import { IToolUse } from "./IToolUse"
 
 export const extractJsonStrings = (str: string): any[] => {
 
@@ -11,6 +8,7 @@ export const extractJsonStrings = (str: string): any[] => {
   let tmpStr = str.slice(0);
 
   for (let ii = 0; ii < tmpStr.length; ++ii) {
+
     if (
       tmpStr[ii] === '[' ||
       tmpStr[ii] === '{'
@@ -19,14 +17,38 @@ export const extractJsonStrings = (str: string): any[] => {
       let squareBracketLevel = 0;
       let curlyBracketLevel = 0;
       let smoothBracketLevel = 0;
+      // let singleQuoteLevel = 0;
+      // let doubleQuoteLevel = 0;
 
       for (let jj = ii + 0; jj < tmpStr.length; ++jj) {
+
         if (tmpStr[jj] === '[') { squareBracketLevel += 1 };
         if (tmpStr[jj] === ']') { squareBracketLevel -= 1 };
         if (tmpStr[jj] === '{') { curlyBracketLevel += 1 };
         if (tmpStr[jj] === '}') { curlyBracketLevel -= 1 };
         if (tmpStr[jj] === '(') { smoothBracketLevel += 1 };
         if (tmpStr[jj] === ')') { smoothBracketLevel -= 1 };
+
+        // console.log(` -> tmpStr[jj]: _${tmpStr[jj]}_`);
+
+        if (tmpStr[jj] === `'`) {
+          for (let kk = jj + 1; kk < tmpStr.length; ++kk) {
+            // console.log(` -> tmpStr[kk]: _${tmpStr[kk]}_`);
+            if (tmpStr[kk] === `'`) {
+              jj = kk; // advance
+              break; // back to the sub loop
+            }
+          }
+        }
+        else if (tmpStr[jj] === `"`) {
+          for (let kk = jj + 1; kk < tmpStr.length; ++kk) {
+            // console.log(` -> tmpStr[kk]: _${tmpStr[kk]}_`);
+            if (tmpStr[kk] === `"`) {
+              jj = kk; // advance
+              break; // back to the sub loop
+            }
+          }
+        }
 
         if (
           squareBracketLevel == 0 &&
